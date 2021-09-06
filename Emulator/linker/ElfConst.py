@@ -1,0 +1,57 @@
+ElfMagic = b'\x7fELF'
+ElfClass32 = b'\x01'
+ElfClass64 = b'\x02'
+ElfData2LSB = b'\x01'
+ElfData2MSB = b'\x02'
+ElfVersion = b'\x01'
+
+Ehdr32_size = 52
+Ehdr64_size = 64
+
+Dyn32_size = 8
+Dyn64_size = 16
+
+DynSym32_size = 16
+DynSym64_size = 24
+
+Rel32_size = 8
+Rel64_size = 16
+
+ARCH_ARM = 40
+ARCH_ARM64 = 183
+
+PT_LOAD = 1
+PT_DYNAMIC = 2
+
+UINT64_MAX = 18446744073709551615
+
+DT_NULL = 0
+DT_NEEDED = 1
+DT_PLTRELSZ = 2
+DT_PLTGOT = 3
+DT_HASH = 4
+DT_STRTAB = 5
+DT_SYMTAB = 6
+DT_RELA = 7
+DT_RELASZ = 8
+DT_RELAENT = 9
+DT_STRSZ = 10
+DT_SYMENT = 11
+DT_INIT = 0x0c
+DT_INIT_ARRAY = 0x19
+DT_FINI_ARRAY = 0x1a
+DT_INIT_ARRAYSZ = 0x1b
+DT_FINI_ARRAYSZ = 0x1c
+DT_SONAME = 14
+DT_RPATH = 15
+DT_SYMBOLIC = 16
+DT_REL = 17
+DT_RELSZ = 18
+DT_RELENT = 19
+DT_PLTREL = 20
+DT_DEBUG = 21
+DT_TEXTREL = 22
+DT_JMPREL = 23
+DT_LOPROC = 0x70000000
+DT_HIPROC = 0x7fffffff
+DT_GNU_HASH = 0x6ffffef5

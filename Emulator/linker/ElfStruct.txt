@@ -1,0 +1,162 @@
+typedef uint32_t Elf32_Addr; // Program address
+typedef uint32_t Elf32_Off;  // File offset
+typedef uint16_t Elf32_Half;
+typedef uint32_t Elf32_Word;
+typedef int32_t  Elf32_Sword;
+
+typedef uint64_t Elf64_Addr;
+typedef uint64_t Elf64_Off;
+typedef uint16_t Elf64_Half;
+typedef uint32_t Elf64_Word;
+typedef int32_t  Elf64_Sword;
+typedef uint64_t Elf64_Xword;
+typedef int64_t  Elf64_Sxword;
+
+<HHIIIIIHHHHHH
+struct Elf32_Ehdr {
+  unsigned  char e_ident[EI_NIDENT]; // ELF Identification bytes
+  uint16_t  Elf32_Half    e_type;      // Type of file (see ET_* below)
+  uint16_t  Elf32_Half    e_machine;   // Required architecture for this file (see EM_*)
+  uint32_t  Elf32_Word    e_version;   // Must be equal to 1
+  uint32_t  Elf32_Addr    e_entry;     // Address to jump to in order to start program
+  uint32_t  Elf32_Off     e_phoff;     // Program header table's file offset, in bytes
+  uint32_t  Elf32_Off     e_shoff;     // Section header table's file offset, in bytes
+  uint32_t  Elf32_Word    e_flags;     // Processor-specific flags
+  uint16_t  Elf32_Half    e_ehsize;    // Size of ELF header, in bytes
+  uint16_t  Elf32_Half    e_phentsize; // Size of an entry in the program header table
+  uint16_t  Elf32_Half    e_phnum;     // Number of entries in the program header table
+  uint16_t  Elf32_Half    e_shentsize; // Size of an entry in the section header table
+  uint16_t  Elf32_Half    e_shnum;     // Number of entries in the section header table
+  uint16_t  Elf32_Half    e_shstrndx;  // Sect hdr table index of sect name string table
+  bool checkMagic() const {
+    return (memcmp(e_ident, ElfMagic, strlen(ElfMagic))) == 0;
+  }
+  unsigned char getFileClass() const { return e_ident[EI_CLASS]; }
+  unsigned char getDataEncoding() const { return e_ident[EI_DATA]; }
+};
+
+// 64-bit ELF header. Fields are the same as for ELF32, but with different
+// types (see above).
+struct Elf64_Ehdr {
+  unsigned  char e_ident[EI_NIDENT];
+  uint16_t  Elf64_Half    e_type;
+  uint16_t  Elf64_Half    e_machine;
+  uint32_t  Elf64_Word    e_version;
+  uint64_t  Elf64_Addr    e_entry;
+  uint64_t  Elf64_Off     e_phoff;
+  uint64_t  Elf64_Off     e_shoff;
+  uint32_t  Elf64_Word    e_flags;
+  uint16_t  Elf64_Half    e_ehsize;
+  uint16_t  Elf64_Half    e_phentsize;
+  uint16_t  Elf64_Half    e_phnum;
+  uint16_t  Elf64_Half    e_shentsize;
+  uint16_t  Elf64_Half    e_shnum;
+  uint16_t  Elf64_Half    e_shstrndx;
+  bool checkMagic() const {
+    return (memcmp(e_ident, ElfMagic, strlen(ElfMagic))) == 0;
+  }
+  unsigned char getFileClass() const { return e_ident[EI_CLASS]; }
+  unsigned char getDataEncoding() const { return e_ident[EI_DATA]; }
+};
+
+// Program header for ELF32.
+struct Elf32_Phdr {
+  uint32_t  Elf32_Word p_type;   // Type of segment
+  uint32_t  Elf32_Off  p_offset; // File offset where segment is located, in bytes
+  uint32_t  Elf32_Addr p_vaddr;  // Virtual address of beginning of segment
+  uint32_t  Elf32_Addr p_paddr;  // Physical address of beginning of segment (OS-specific)
+  uint32_t  Elf32_Word p_filesz; // Num. of bytes in file image of segment (may be zero)
+  uint32_t  Elf32_Word p_memsz;  // Num. of bytes in mem image of segment (may be zero)
+  uint32_t  Elf32_Word p_flags;  // Segment flags
+  uint32_t  Elf32_Word p_align;  // Segment alignment constraint
+};
+
+p_type,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz ,p_flags ,p_align
+
+"p_type":p_type  ,"p_flags":p_flags  ,"p_offset":p_offset,"p_vaddr":p_vaddr  ,"p_paddr":p_paddr  ,"p_filesz":p_filesz,"p_memsz":p_memsz  ,"p_align":p_align
+
+// Program header for ELF64.
+struct Elf64_Phdr {
+  uint32_t  Elf64_Word   p_type;   // Type of segment
+  uint32_t  Elf64_Word   p_flags;  // Segment flags
+  uint64_t  Elf64_Off    p_offset; // File offset where segment is located, in bytes
+  uint64_t  Elf64_Addr   p_vaddr;  // Virtual address of beginning of segment
+  uint64_t  Elf64_Addr   p_paddr;  // Physical addr of beginning of segment (OS-specific)
+  uint64_t  Elf64_Xword  p_filesz; // Num. of bytes in file image of segment (may be zero)
+  uint64_t  Elf64_Xword  p_memsz;  // Num. of bytes in mem image of segment (may be zero)
+  uint64_t  Elf64_Xword  p_align;  // Segment alignment constraint
+};
+
+// Symbol table entries for ELF32.
+struct Elf32_Sym {
+  Elf32_Word    st_name;  // Symbol name (index into string table)
+  Elf32_Addr    st_value; // Value or address associated with the symbol
+  Elf32_Word    st_size;  // Size of the symbol
+  unsigned char st_info;  // Symbol's type and binding attributes
+  unsigned char st_other; // Must be zero; reserved
+  Elf32_Half    st_shndx; // Which section (header table index) it's defined in
+
+  // These accessors and mutators correspond to the ELF32_ST_BIND,
+  // ELF32_ST_TYPE, and ELF32_ST_INFO macros defined in the ELF specification:
+  unsigned char getBinding() const { return st_info >> 4; }
+  unsigned char getType() const { return st_info & 0x0f; }
+  void setBinding(unsigned char b) { setBindingAndType(b, getType()); }
+  void setType(unsigned char t) { setBindingAndType(getBinding(), t); }
+  void setBindingAndType(unsigned char b, unsigned char t) {
+    st_info = (b << 4) + (t & 0x0f);
+  }
+};
+
+// Symbol table entries for ELF64.
+struct Elf64_Sym {
+  Elf64_Word      st_name;  // Symbol name (index into string table)
+  unsigned char   st_info;  // Symbol's type and binding attributes
+  unsigned char   st_other; // Must be zero; reserved
+  Elf64_Half      st_shndx; // Which section (header tbl index) it's defined in
+  Elf64_Addr      st_value; // Value or address associated with the symbol
+  Elf64_Xword     st_size;  // Size of the symbol
+
+  // These accessors and mutators are identical to those defined for ELF32
+  // symbol table entries.
+  unsigned char getBinding() const { return st_info >> 4; }
+  unsigned char getType() const { return st_info & 0x0f; }
+  void setBinding(unsigned char b) { setBindingAndType(b, getType()); }
+  void setType(unsigned char t) { setBindingAndType(getBinding(), t); }
+  void setBindingAndType(unsigned char b, unsigned char t) {
+    st_info = (b << 4) + (t & 0x0f);
+  }
+};
+
+// Relocation entry, without explicit addend.
+struct Elf32_Rel {
+  Elf32_Addr r_offset; // Location (file byte offset, or program virtual addr)
+  Elf32_Word r_info;   // Symbol table index and type of relocation to apply
+
+  // These accessors and mutators correspond to the ELF32_R_SYM, ELF32_R_TYPE,
+  // and ELF32_R_INFO macros defined in the ELF specification:
+  Elf32_Word getSymbol() const { return (r_info >> 8); }
+  unsigned char getType() const { return (unsigned char) (r_info & 0x0ff); }
+  void setSymbol(Elf32_Word s) { setSymbolAndType(s, getType()); }
+  void setType(unsigned char t) { setSymbolAndType(getSymbol(), t); }
+  void setSymbolAndType(Elf32_Word s, unsigned char t) {
+    r_info = (s << 8) + t;
+  }
+};
+
+// Relocation entry, without explicit addend.
+struct Elf64_Rel {
+  Elf64_Addr r_offset; // Location (file byte offset, or program virtual addr).
+  Elf64_Xword r_info;   // Symbol table index and type of relocation to apply.
+
+  // These accessors and mutators correspond to the ELF64_R_SYM, ELF64_R_TYPE,
+  // and ELF64_R_INFO macros defined in the ELF specification:
+  Elf64_Word getSymbol() const { return (r_info >> 32); }
+  Elf64_Word getType() const {
+    return (Elf64_Word) (r_info & 0xffffffffL);
+  }
+  void setSymbol(Elf64_Word s) { setSymbolAndType(s, getType()); }
+  void setType(Elf64_Word t) { setSymbolAndType(getSymbol(), t); }
+  void setSymbolAndType(Elf64_Word s, Elf64_Word t) {
+    r_info = ((Elf64_Xword)s << 32) + (t&0xffffffffL);
+  }
+};
