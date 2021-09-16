@@ -203,19 +203,30 @@ class ElfReader:
             if d_tag == ElfConst.DT_NULL:
                 break
 
+        nsyms = 0
         if self.hash_off > 0:
             self.fd.seek(self.virtualMemoryAddrToFileOffset(self.hash_off), 0)
             self.nbucket, self.nchain = struct.unpack("<II", self.fd.read(8))
             self.bucket = self.hash_off + 8
             self.chain = self.hash_off + 8 + self.nbucket * 4
+            nsyms = self.nchain
         elif self.gnu_hash_off > 0:
             self.is_gnu_hash = True
             self.fd.seek(self.virtualMemoryAddrToFileOffset(self.gnu_hash_off), 0)
             gnu_nbucket, symndx, gnu_maskwords, gnu_shift2 = struct.unpack("<IIII", self.fd.read(16))
-            self.nchain = symndx
             gnu_bloom_filter = self.gnu_hash_off + 16
-            gnu_bucket = gnu_bloom_filter + gnu_maskwords
-            gnu_chain = gnu_bucket + gnu_nbucket - symndx
+            gnu_bucket = gnu_bloom_filter + gnu_maskwords * (4 if self.elfClass == b'\x01' else 8)
+            gnu_chain = gnu_bucket + gnu_nbucket * 4 - symndx * 4
+            last_bucket_id = gnu_nbucket - 1
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(gnu_bucket + 4 * last_bucket_id), 0)
+            symidx = int.from_bytes(self.fd.read(4), byteorder='little', signed=False)
+            while True:
+                self.fd.seek(self.virtualMemoryAddrToFileOffset(gnu_chain + 4 * symidx), 0)
+                chain = int.from_bytes(self.fd.read(4), byteorder='little', signed=False)
+                if (chain & 1) == 1:
+                    break
+                symidx = symidx + 1
+            nsyms = symidx + 1
 
         if self.dyn_str_off > 0:
             self.fd.seek(self.virtualMemoryAddrToFileOffset(self.dyn_str_off), 0)
@@ -225,8 +236,8 @@ class ElfReader:
             self.soName = self.st_name_to_name(self.soname_off)
 
         if self.dyn_sym_off > 0:
-            self.fd.seek(self.dyn_sym_off, 0)
-            for i in range(0, self.nchain):
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(self.dyn_sym_off), 0)
+            for i in range(0, nsyms):
                 sym_bytes = self.fd.read(self.sym_entry_size)
                 if self.elfClass == b'\x01':
                     st_name, st_value, st_size, st_info, st_other, st_shndx = struct.unpack("<IIIccH", sym_bytes)
@@ -242,7 +253,7 @@ class ElfReader:
                      "st_shndx": st_shndx, "st_info_bind": st_info_bind, "st_info_type": st_info_type})
 
         if self.rel_off > 0:
-            self.fd.seek(self.rel_off, 0)
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(self.rel_off), 0)
             rel_table = []
             rel_count = int(self.rel_size / self.rel_entry_size)
             for i in range(0, rel_count):
@@ -262,7 +273,7 @@ class ElfReader:
             self.rels["dynrel"] = rel_table
 
         if self.relplt_off > 0:
-            self.fd.seek(self.relplt_off, 0)
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(self.relplt_off), 0)
             relplt_table = []
             relplt_count = int(self.relplt_size / self.rel_entry_size)
             for i in range(0, relplt_count):
@@ -318,3 +329,6 @@ class ElfReader:
                         "to memory outside file range" % (address, str(Phdr)))
                 return Phdr["p_offset"] + relativeOffset
         raise Exception("Cannot find segment for address %08x" % address)
+
+    def soinfo_alloc(self):
+        pass

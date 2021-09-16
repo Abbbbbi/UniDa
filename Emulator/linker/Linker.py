@@ -18,7 +18,10 @@ class Linker:
         if not reader.load():
             raise Exception("ElfReader load Failed")
 
-        self.soinfo_link_image(reader)
+        for so_name in reader.so_needed:
+            self.do_dlopen(so_name, True)
+
+        self.soinfo_relocate(reader)
 
         module = Module(reader.load_start, reader.load_size, reader.soName, reader.load_bias)
         self.modules.append(module)
@@ -40,8 +43,5 @@ class Linker:
         if callInit:
             module.callInit()
 
-    def soinfo_link_image(self, elfReader):
-        for so_name in elfReader.so_needed:
-            self.do_dlopen(so_name, True)
-            pass
+    def soinfo_relocate(self, elfReader):
         pass
