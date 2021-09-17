@@ -20,7 +20,6 @@ class ElfReader:
         self.phNum = 0
         self.phEntrySize = 0
         self.programHeaderTable = []
-        self.load_bias = 0
         self.load_start = 0
         self.load_size = 0
 
@@ -121,7 +120,6 @@ class ElfReader:
         if self.load_size == 0:
             raise Exception('%s has no loadable segments' % self.fileName)
         self.load_start = self.emulator.memory.mmap(min_vaddr, self.load_size, mem_reserve=True)
-        self.load_bias = self.load_start - min_vaddr
         self.emulator.syscallHandler.FDMaps[self.fdKey]["addr"] = self.load_start
         return True
 
@@ -134,7 +132,7 @@ class ElfReader:
             if Phdr["p_type"] != ElfConst.PT_LOAD:
                 continue
             # segment在内存中地址
-            seg_start = Phdr["p_vaddr"] + self.load_bias
+            seg_start = Phdr["p_vaddr"] + self.load_start
             seg_end = seg_start + Phdr["p_memsz"]
 
             seg_page_start = PAGE_START(seg_start)
@@ -172,11 +170,11 @@ class ElfReader:
                 self.gnu_hash_off = d_val_ptr
             if d_tag == ElfConst.DT_PLTGOT:
                 self.plt_got_off = d_val_ptr
-            if d_tag == ElfConst.DT_REL or d_tag == ElfConst.DT_RELA:
+            if d_tag in (ElfConst.DT_REL, ElfConst.DT_RELA):
                 self.rel_off = d_val_ptr
-            if d_tag == ElfConst.DT_RELSZ or d_tag == ElfConst.DT_RELASZ:
+            if d_tag in (ElfConst.DT_RELSZ, ElfConst.DT_RELASZ):
                 self.rel_size = d_val_ptr
-            if d_tag == ElfConst.DT_RELENT or d_tag == ElfConst.DT_RELAENT:
+            if d_tag in (ElfConst.DT_RELENT, ElfConst.DT_RELAENT):
                 self.rel_entry_size = d_val_ptr
             if d_tag == ElfConst.DT_JMPREL:
                 self.relplt_off = d_val_ptr
@@ -294,6 +292,7 @@ class ElfReader:
 
         for str_off in self.dt_need:
             self.so_needed.append(self.st_name_to_name(str_off))
+
         return True
 
     def loadDone(self):
@@ -329,6 +328,9 @@ class ElfReader:
                         "to memory outside file range" % (address, str(Phdr)))
                 return Phdr["p_offset"] + relativeOffset
         raise Exception("Cannot find segment for address %08x" % address)
+
+    def get_init_array(self):
+        return self.init_array_off, self.init_array_size
 
     def soinfo_alloc(self):
         pass
