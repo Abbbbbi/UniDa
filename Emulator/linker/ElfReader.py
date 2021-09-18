@@ -10,8 +10,8 @@ class ElfReader:
         self.fileName = fileName
         self.soName = ""
         self.emulator = emulator
-        self.fdKey = emulator.syscallHandler.findMinFd()
-        emulator.syscallHandler.FDMaps[self.fdKey] = {"fd": fd, "addr": 0}
+        self.fdKey = emulator.PCB.findMinFd()
+        emulator.PCB.FDMaps[self.fdKey] = {"fd": fd, "addr": 0}
 
         self.elfData = None
         self.elfClass = None

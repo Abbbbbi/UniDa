@@ -91,7 +91,7 @@ class Linker:
         if reader.init_off != 0:
             init_array.append(reader.load_start + reader.init_off)
 
-        PointerSize = 8 if self.emulator.is64Bit else 4
+        PointerSize = self.emulator.getPointSize()
 
         for _ in range(int(init_array_size / PointerSize)):
             b = self.emulator.mu.mem_read(reader.load_start + init_array_offset, PointerSize)

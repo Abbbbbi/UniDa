@@ -1,4 +1,4 @@
-class SyscallHandler:
+class PCB:
     def __init__(self):
         self.FDMaps = {}
         pass
