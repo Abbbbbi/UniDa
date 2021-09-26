@@ -33,12 +33,3 @@ def PFLAGS_TO_PROT(prot_in):
 
     return prot
 
-
-def align(addr, size, page_size):
-    mask = -page_size
-    right = addr + size
-    right = (right + page_size - 1) & mask
-    addr &= mask
-    size = right - addr
-    size = (size + page_size - 1) & mask
-    return addr, size

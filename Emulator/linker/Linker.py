@@ -2,7 +2,7 @@ from Emulator.linker import ElfConst
 from Emulator.linker.ElfReader import ElfReader
 from Emulator.linker.Module import Module
 from Emulator.utils.Open_Helpers import openSOByName
-from unicorn import *
+from unicorn import UC_PROT_WRITE, UC_PROT_READ
 
 
 class Linker:

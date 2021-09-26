@@ -1,15 +1,11 @@
 import os
-import traceback
-
 from unicorn import *
-
 from Emulator.utils.Memory_Helpers import *
 
 
 class Memory:
-    def __init__(self, emulator, mu):
+    def __init__(self, emulator):
         self.emulator = emulator
-        self.mu = mu
 
     def mmap(self, address, size, prot=UC_PROT_READ | UC_PROT_WRITE, fdKey=-1, offset=0, mem_reserve=False):
         if not self._is_multiple(address):
@@ -20,10 +16,10 @@ class Memory:
         al_size = PAGE_END(al_address + size) - al_address
         res_addr = self._map(al_address, al_size, prot, mem_reserve)
         if res_addr != -1 and fdKey != -1:
-            fd = self.emulator.syscallHandler.FDMaps[fdKey]["fd"]
+            fd = self.emulator.PCB.FDMaps[fdKey]["fd"]
             fd.seek(offset, 0)
             data = self._read_fully(fd, size)
-            self.mu.mem_write(res_addr, data)
+            self.emulator.mu.mem_write(res_addr, data)
         return res_addr
 
     def _map(self, address, size, prot=UC_PROT_READ | UC_PROT_WRITE, mem_reserve=False):
@@ -32,7 +28,7 @@ class Memory:
         try:
             if address == 0:
                 regions = []
-                for r in self.mu.mem_regions():
+                for r in self.emulator.mu.mem_regions():
                     regions.append(r)
                 regions.sort()
                 map_base = -1
@@ -58,12 +54,12 @@ class Memory:
                 print("before mem_map address:0x%08X, sz:0x%08X" % (map_base, size))
 
                 if not mem_reserve:
-                    self.mu.mem_map(map_base, size, perms=prot)
+                    self.emulator.mu.mem_map(map_base, size, perms=prot)
                 return map_base
             else:
                 # MAP_FIXED
                 try:
-                    self.mu.mem_map(address, size, perms=prot)
+                    self.emulator.mu.mem_map(address, size, perms=prot)
                 except unicorn.UcError as e:
                     if e.errno == UC_ERR_MAP:
                         blocks = set()
@@ -71,7 +67,7 @@ class Memory:
                         for b in range(address, address + size, 0x1000):
                             blocks.add(b)
 
-                        for r in self.mu.mem_regions():
+                        for r in self.emulator.mu.mem_regions():
                             # 修改属性
                             raddr = r[0]
                             rend = r[1] + 1
@@ -81,15 +77,15 @@ class Memory:
                                     extra_protect.add(b)
 
                         for b_map in blocks:
-                            self.mu.mem_map(b_map, 0x1000, prot)
+                            self.emulator.mu.mem_map(b_map, 0x1000, prot)
 
                         for b_protect in extra_protect:
-                            self.mu.mem_protect(b_protect, 0x1000, prot)
+                            self.emulator.mu.mem_protect(b_protect, 0x1000, prot)
 
                 return address
 
         except unicorn.UcError as e:
-            for r in self.mu.mem_regions():
+            for r in self.emulator.mu.mem_regions():
                 print("region begin :0x%08X end:0x%08X, prot:%d" % (r[0], r[1], r[2]))
             raise
 
@@ -99,7 +95,7 @@ class Memory:
 
         len_in = PAGE_END(address + len) - address
         try:
-            self.mu.mem_protect(address, len_in, prot)
+            self.emulator.mu.mem_protect(address, len_in, prot)
         except unicorn.UcError as e:
             print("Warning mprotect with address: 0x%08X len: 0x%08X prot:0x%08X failed!!!" % (address, len, prot))
             return -1
@@ -114,10 +110,10 @@ class Memory:
             print("unmap 0x%08X sz=0x0x%08X end=0x0x%08X" % (address, size, address + size))
             for fdKey, fdMap in self.emulator.syscallHandler.FDMaps:
                 if fdMap["addr"] == address:
-                    del self.emulator.syscallHandler.FDMaps[fdKey]
-            self.mu.mem_unmap(address, size)
+                    del self.emulator.PCB.FDMaps[fdKey]
+            self.emulator.mu.mem_unmap(address, size)
         except unicorn.UcError as e:
-            for r in self.mu.mem_regions():
+            for r in self.emulator.mu.mem_regions():
                 print("region begin :0x%08X end:0x%08X, prot:%d" % (r[0], r[1], r[2]))
             raise
         return 0

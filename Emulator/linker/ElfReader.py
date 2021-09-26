@@ -297,7 +297,7 @@ class ElfReader:
 
     def loadDone(self):
         self.fd.close()
-        del self.emulator.syscallHandler.FDMaps[self.fdKey]
+        del self.emulator.PCB.FDMaps[self.fdKey]
         return True
 
     def st_name_to_name(self, st_name):
@@ -308,14 +308,6 @@ class ElfReader:
         r = self.dyn_str_buf[st_name:endId]
         name = r.decode("utf-8")
         return name
-
-    def get_dyn_string_by_rel_sym(self, rel_sym):
-        nsym = len(self.dynsymols)
-        assert rel_sym < nsym
-        sym = self.dynsymols[rel_sym]
-        st_name = sym["st_name"]
-        r = self.st_name_to_name(st_name)
-        return r
 
     def virtualMemoryAddrToFileOffset(self, address):
         for Phdr in self.programHeaderTable:

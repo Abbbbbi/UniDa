@@ -1,0 +1,2 @@
+EXCP_SWI = 2
+EXCP_BKPT = 7
