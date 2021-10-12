@@ -7,7 +7,7 @@ from Emulator.hooks.ARMConst import *
 class ARM64SyscallHandler:
     def __init__(self, emulator):
         self.emulator = emulator
-        self.syscallHandlerMaps = dict()
+        self.syscallHandlerMaps = {}
         self.emulator.mu.hook_add(UC_HOOK_INTR, self.hook)
 
     def hook(self, mu, intno, swi, userdata):
@@ -22,9 +22,9 @@ class ARM64SyscallHandler:
                 mu.reg_write(UC_ARM64_REG_X0, self.emulator.hooker.hookMaps[swi](mu))
                 return
             mu.emu_stop()
-            raise Exception("Unhandled svc or svcHook %d" % swi)
+            raise Exception("Unhandled svcHook %d" % swi)
         if NR in self.syscallHandlerMaps:
             mu.reg_write(UC_ARM64_REG_X0, self.syscallHandlerMaps[NR](mu))
             return
         mu.emu_stop()
-        raise Exception("Unhandled svc or svcHook %d" % swi)
+        raise Exception("Unhandled sv %d" % NR)

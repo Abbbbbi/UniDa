@@ -7,8 +7,7 @@ rpc.exports = {
     callJniEnvFunc(funcName, args) {
         return Java.vm.tryGetEnv()[funcName].apply(null, args)
     },
-    testfunc(soName, exportName) {
-        var funcAddr = Module.findExportByName(soName, exportName)
-        return funcAddr
+    testFunc(soName, exportName) {
+        return Module.findExportByName(soName, exportName)
     }
 }

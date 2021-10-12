@@ -1,5 +1,8 @@
 from unicorn import UC_PROT_WRITE, UC_PROT_READ, UC_PROT_EXEC, UC_HOOK_INTR
 
+from Emulator.hooks.JniHooks import JniHooks
+from Emulator.hooks.NativeHooks import NativeHooks
+
 
 class Hooker:
     def __init__(self, emulator):
@@ -7,6 +10,8 @@ class Hooker:
         self.hookMaps = dict()
         hooker_area_size = 0x10000
         self.hooker_area_base = emulator.memory.mmap(0, hooker_area_size, UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC)
+        self.nativeHooks = NativeHooks(self)
+        self.jniHooks = JniHooks(self, emulator.vm)
 
     def write_function(self, func):
         hookId = self.findMinHookId()
@@ -30,10 +35,10 @@ class Hooker:
             struct_table_bytes += int(addr).to_bytes(PointSize, byteorder='little')
         self.emulator.mu.mem_write(struct_table_addr, struct_table_bytes)
         self.hooker_area_base += len(struct_table_bytes)
-        ptr_struct_table_addr = self.hooker_area_base
-        self.emulator.mu.mem_write(ptr_struct_table_addr, struct_table_addr.to_bytes(PointSize, byteorder='little'))
+        struct_table_addr_ptr = self.hooker_area_base
+        self.emulator.mu.mem_write(struct_table_addr_ptr, struct_table_addr.to_bytes(PointSize, byteorder='little'))
         self.hooker_area_base += PointSize
-        return ptr_struct_table_addr, struct_table_addr
+        return struct_table_addr_ptr, struct_table_addr
 
     def findMinHookId(self):
         hookId = 0xFF00
