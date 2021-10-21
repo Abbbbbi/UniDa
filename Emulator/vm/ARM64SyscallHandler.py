@@ -10,11 +10,15 @@ class ARM64SyscallHandler:
         self.syscallHandlerMaps = {}
         self.emulator.mu.hook_add(UC_HOOK_INTR, self.hook)
 
-    def hook(self, mu, intno, swi, userdata):
+    def hook(self, mu, intno, userdata):
         # 断点
+        pc = mu.reg_read(UC_ARM64_REG_PC)
+        swi = (int.from_bytes(mu.mem_read(pc - 4, 4), byteorder='little') >> 5) & 0xff
+        print(swi)
         if intno == EXCP_BKPT:
             return
         if intno != EXCP_SWI:
+            mu.emu_stop()
             raise Exception("Unhandled interrupt %d" % intno)
         NR = mu.reg_read(UC_ARM64_REG_X8)
         if swi != 0:

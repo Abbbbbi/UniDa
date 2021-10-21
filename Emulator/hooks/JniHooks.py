@@ -1,11 +1,17 @@
+import logging
+
 from Emulator.dvm.JniConst import *
 from Emulator.utils.Memory_Helpers import *
+
+logger = logging.getLogger(__name__)
 
 
 class JniHooks:
     # https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/jniTOC.html
-    def __init__(self, hooker, vm):
-        self.vm = vm
+    def __init__(self, hooker, emulator):
+        self.emulator = emulator
+        self.vm = emulator.vm
+        self.throwable = None
         self.JniEnvAddr, self.JniEnvTableAddr = hooker.write_function_table({
             4: self._GetVersion,
             5: self._DefineClass,
@@ -237,7 +243,7 @@ class JniHooks:
             231: self._GetDirectBufferCapacity,
             232: self._GetObjectRefType
         })
-        self.JavaVMAddr, self.JavaVMTableAddr = hooker.write_function_table({
+        self.JavaVMAddr, self.JNIInvokeInterface = hooker.write_function_table({
             3: self._DestroyJavaVM,
             4: self._AttachCurrentThread,
             5: self._DetachCurrentThread,
@@ -249,7 +255,13 @@ class JniHooks:
         raise NotImplementedError()
 
     def _AttachCurrentThread(self, mu):
-        raise NotImplementedError()
+        vm = getPointerArg(mu, 0)
+        env = getPointerArg(mu, 1)
+        version = getPointerArg(mu, 3)
+        mu.mem_write(env, self.JniEnvAddr)
+        logger.info("JavaVM->AttachCurrentThread() was called from %s vm=0x%x env=0x%x version=0x%x" % (
+            ptrStr(self.emulator.linker, getLRPointer(mu)), vm, env, version))
+        return JNI_OK
 
     def _DetachCurrentThread(self, mu):
         raise NotImplementedError()
@@ -259,6 +271,8 @@ class JniHooks:
         env = getPointerArg(mu, 1)
         version = getPointerArg(mu, 3)
         mu.mem_write(env, self.JniEnvAddr)
+        logger.info("JavaVM->GetEnv() was called from %s vm=0x%x env=0x%x version=0x%x" % (
+            ptrStr(self.emulator.linker, getLRPointer(mu)), vm, env, version))
         return JNI_OK
 
     def _AttachCurrentThreadAsDaemon(self, mu):
@@ -274,7 +288,8 @@ class JniHooks:
         className = getPointerArg(mu, 1)
         name = read_utf8(mu, className)
         dvmClass = self.vm.resolveClass(name)
-        h = dvmClass.hashCode() & 0xffffffff
+        h = toIntPeer(dvmClass.hashCode())
+        logger.info("JNIEnv->FindClass(%s) was called from %s" % (name, ptrStr(self.emulator.linker, getLRPointer(mu))))
         return h
 
     def _FromReflectedMethod(self, mu):
@@ -286,10 +301,10 @@ class JniHooks:
     def _ToReflectedMethod(self, mu):
         clazz = getPointerArg(mu, 1)
         jmethodID = getPointerArg(mu, 2)
-        h = clazz & 0xffffffff
+        h = toIntPeer(clazz)
         if h in self.vm.classMaps:
             dvmClass = self.vm.classMaps[h]
-            mh = jmethodID & 0xffffffff
+            mh = toIntPeer(jmethodID)
             dvmMethod = dvmClass.getMethod()
             if dvmMethod is None:
                 dvmMethod = dvmClass.getMethod(mh, True)
@@ -310,37 +325,55 @@ class JniHooks:
         raise NotImplementedError()
 
     def _Throw(self, mu):
-        raise NotImplementedError()
+        obj = getPointerArg(mu, 1)
+        self.throwable = self.vm.getObject(toIntPeer(obj))
+        logger.warning(
+            "Throw object=0x%x dvmObject=%s class=%s" % (obj, str(self.throwable), str(self.throwable.dvmClass)))
+        return 0
 
     def _ThrowNew(self, mu):
         raise NotImplementedError()
 
     def _ExceptionOccurred(self, mu):
-        raise NotImplementedError()
+        logger.debug("ExceptionOccurred")
+        return JNI_NULL if self.throwable is None else toIntPeer(self.throwable.hashCode())
 
     def _ExceptionDescribe(self, mu):
         raise NotImplementedError()
 
     def _ExceptionClear(self, mu):
-        raise NotImplementedError()
+        logger.debug("ExceptionClear")
+        self.throwable = None
+        return 0
 
     def _FatalError(self, mu):
         raise NotImplementedError()
 
     def _PushLocalFrame(self, mu):
-        raise NotImplementedError()
+        capacity = getPointerArg(mu, 1)
+        logger.debug("PushLocalFrame capacity=%d" % capacity)
+        return JNI_OK
 
     def _PopLocalFrame(self, mu):
-        raise NotImplementedError()
+        jresult = getPointerArg(mu, 1)
+        logger.debug("PopLocalFrame jresult=%d" % jresult)
+        return 0 if jresult is None else toIntPeer(jresult)
 
     def _NewGlobalRef(self, mu):
-        raise NotImplementedError()
+        obj = getPointerArg(mu, 1)
+        dvmObject = self.vm.getObject(toIntPeer(obj))
+        logger.debug("NewGlobalRef object=0x%x dvmObject=%s" % (obj, str(dvmObject)))
+        return self.vm.addObject(dvmObject)
 
     def _DeleteGlobalRef(self, mu):
-        raise NotImplementedError()
+        obj = getPointerArg(mu, 1)
+        del self.vm.globalObjectMaps[toIntPeer(obj)]
+        return 0
 
     def _DeleteLocalRef(self, mu):
-        raise NotImplementedError()
+        obj = getPointerArg(mu, 1)
+        del self.vm.localObjectMaps[toIntPeer(obj)]
+        return 0
 
     def _IsSameObject(self, mu):
         raise NotImplementedError()

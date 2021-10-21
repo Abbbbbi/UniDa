@@ -7,7 +7,7 @@ def openSOByName(emu, soName):
         apkFD = openApkLib(emu, soName)
         if apkFD is not None:
             return apkFD
-    baseLibPath = "SystemLib/SDK23/%s" % "lib64" if emu.is64Bit else "lib"
+    baseLibPath = "SystemLib/SDK23/%s" % ("lib64" if emu.is64Bit else "lib")
     for fileName in os.listdir(baseLibPath):
         if soName.replace("+", "p") in fileName:
             return open(baseLibPath + "/" + fileName, 'rb')

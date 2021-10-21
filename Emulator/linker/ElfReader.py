@@ -1,6 +1,7 @@
 import struct
 
 from Emulator.linker import ElfConst
+from Emulator.linker.AndroidRelocationIterator import AndroidRelocationIterator
 from Emulator.utils.Memory_Helpers import PAGE_START, PAGE_END, PFLAGS_TO_PROT
 
 
@@ -28,6 +29,11 @@ class ElfReader:
         self.rel_size = 0
         self.relplt_off = 0
         self.relplt_size = 0
+        self.androidRel_off = 0
+        self.androidRel_size = 0
+        self.androidRelA_off = 0
+        self.androidRelA_size = 0
+        self.androidRel_buf = b''
         self.rel_entry_size = 0
         self.init_off = 0
         self.init_array_off = 0
@@ -120,7 +126,7 @@ class ElfReader:
         if self.load_size == 0:
             raise Exception('%s has no loadable segments' % self.fileName)
         self.load_start = self.emulator.memory.mmap(min_vaddr, self.load_size, mem_reserve=True)
-        self.emulator.syscallHandler.FDMaps[self.fdKey]["addr"] = self.load_start
+        self.emulator.PCB.FDMaps[self.fdKey]["addr"] = self.load_start
         return True
 
     def loadSegments(self):
@@ -180,6 +186,14 @@ class ElfReader:
                 self.relplt_off = d_val_ptr
             if d_tag == ElfConst.DT_PLTRELSZ:
                 self.relplt_size = d_val_ptr
+            if d_tag == ElfConst.DT_ANDROID_REL:
+                self.androidRel_off = d_val_ptr
+            if d_tag == ElfConst.DT_ANDROID_RELSZ:
+                self.androidRel_size = d_val_ptr
+            if d_tag == ElfConst.DT_ANDROID_RELA:
+                self.androidRelA_off = d_val_ptr
+            if d_tag == ElfConst.DT_ANDROID_RELASZ:
+                self.androidRelA_size = d_val_ptr
             if d_tag == ElfConst.DT_SYMTAB:
                 self.dyn_sym_off = d_val_ptr
             if d_tag == ElfConst.DT_SYMENT:
@@ -290,6 +304,31 @@ class ElfReader:
                      "r_info_sym": r_info_sym})
             self.rels["relplt"] = relplt_table
 
+        if self.androidRel_off > 0:
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(self.androidRel_off), 0)
+            magic = bytes.decode(self.fd.read(4))
+            androidRel_table = []
+            if self.androidRel_size >= 4 and "APS2" == magic:
+                packed_relocs_size = self.androidRel_size - 4
+                self.androidRel_buf = self.fd.read(packed_relocs_size)
+                androidRelocationIterator = iter(AndroidRelocationIterator(self.androidRel_buf, self.elfClass))
+                for androidRelocation in androidRelocationIterator:
+                    if androidRelocation is not None:
+                        androidRel_table.append(androidRelocation)
+                self.rels["androidRel"] = androidRel_table
+        elif self.androidRelA_off > 0:
+            self.fd.seek(self.virtualMemoryAddrToFileOffset(self.androidRelA_off), 0)
+            magic = bytes.decode(self.fd.read(4))
+            androidRel_table = []
+            if self.androidRelA_size >= 4 and "APS2" == magic:
+                packed_relocs_size = self.androidRelA_size - 4
+                self.androidRel_buf = self.fd.read(packed_relocs_size)
+                androidRelocationIterator = iter(AndroidRelocationIterator(self.androidRel_buf, self.elfClass, True))
+                for androidRelocation in androidRelocationIterator:
+                    if androidRelocation is not None:
+                        androidRel_table.append(androidRelocation)
+                self.rels["androidRel"] = androidRel_table
+
         for str_off in self.dt_need:
             self.so_needed.append(self.st_name_to_name(str_off))
 
@@ -315,11 +354,11 @@ class ElfReader:
                 relativeOffset = address - Phdr["p_vaddr"]
                 if relativeOffset >= Phdr["p_filesz"]:
                     raise Exception(
-                        "Can not convert virtual memory address %08x to file offset - found segment %s but address "
+                        "Can not convert virtual memory address 0x%x to file offset - found segment %s but address "
                         "maps "
                         "to memory outside file range" % (address, str(Phdr)))
                 return Phdr["p_offset"] + relativeOffset
-        raise Exception("Cannot find segment for address %08x" % address)
+        raise Exception("Cannot find segment for address 0x%x" % address)
 
     def get_init_array(self):
         return self.init_array_off, self.init_array_size

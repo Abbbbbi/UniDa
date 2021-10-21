@@ -36,9 +36,9 @@ class DalvikVM:
             self.localObjectMaps[h] = {"obj": obj, "weak": weak}
         return h
 
-    def getObject(self, hash):
-        if hash in self.globalObjectMaps:
-            return self.globalObjectMaps[hash].obj
-        elif hash in self.localObjectMaps:
-            return self.localObjectMaps[hash].obj
+    def getObject(self, h):
+        if h in self.globalObjectMaps:
+            return self.globalObjectMaps[h].obj
+        elif h in self.localObjectMaps:
+            return self.localObjectMaps[h].obj
         return None

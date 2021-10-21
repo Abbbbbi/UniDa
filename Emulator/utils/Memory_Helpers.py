@@ -1,3 +1,4 @@
+from unicorn import UC_PROT_READ, UC_PROT_WRITE, UC_PROT_EXEC
 from unicorn.arm64_const import *
 
 from unicorn.arm_const import *
@@ -13,6 +14,9 @@ MAP_FIXED = 0x10
 
 MAP_ALLOC_BASE = 0x40000000
 MAP_ALLOC_SIZE = 0xA0000000 - MAP_ALLOC_BASE
+
+STACK_ALLOC_BASE = 0xc0000000
+STACK_ALLOC_SIZE = 256 * PAGE_SIZE
 
 
 def PAGE_START(addr):
@@ -38,18 +42,47 @@ def PFLAGS_TO_PROT(prot_in):
     return prot
 
 
-def getPointerArg(mu, index, is64=True):
+def getPointerArg(mu, index):
     regArgCount = 4
-    ArgReg0 = UC_ARM_REG_R0
-    SPReg = UC_ARM_REG_SP
-    if is64:
+    R0_REG = UC_ARM_REG_R0
+    SP_REG = UC_ARM_REG_SP
+    pointerSize = 4
+    if mu._arch == 2:
         regArgCount = 8
-        ArgReg0 = UC_ARM64_REG_X0
-        SPReg = UC_ARM64_REG_SP
+        R0_REG = UC_ARM64_REG_X0
+        SP_REG = UC_ARM64_REG_SP
+        pointerSize = 8
     if index < regArgCount:
-        return mu.mem_read(ArgReg0 + index)
+        return int.from_bytes(mu.reg_read(R0_REG + index), byteorder='little')
+    sp = mu.reg_read(SP_REG)
+    return int.from_bytes(mu.mem_read(sp + (index - regArgCount) * pointerSize), byteorder='little')
 
-    return mu.mem_read(SPReg)
+
+def getLRPointer(mu):
+    LR_REG = UC_ARM_REG_LR
+    if mu._arch == 2:
+        LR_REG = UC_ARM64_REG_LR
+    return mu.reg_read(LR_REG)
+
+
+def ptrStr(linker, addr):
+    m = linker.findModuleByAddress(addr)
+    protName = ""
+    for r in linker.emulator.mu.mem_regions():
+        if r[0] <= addr < r[1]:
+            prot = r[2]
+            if prot & UC_PROT_READ != 0:
+                protName += "R"
+            if prot & UC_PROT_WRITE != 0:
+                protName += "W"
+            if prot & UC_PROT_EXEC != 0:
+                protName += "X"
+
+    return "%s@0x%X[%s:0x%X]0x%X" % (protName, addr, m.so_name, m.base, addr - m.base)
+
+
+def toIntPeer(addr):
+    return addr & 0xffffffff
 
 
 def read_utf8(mu, address):
@@ -67,3 +100,12 @@ def read_utf8(mu, address):
         buffer_address += buffer_read_size
 
     return buffer[:null_pos].decode("utf-8")
+
+
+def write_utf8(mu, address, value):
+    mu.mem_write(address, value.encode(encoding="utf-8") + b"\x00")
+    return address
+
+
+def isThumb(mu):
+    pass

@@ -10,8 +10,15 @@ class ARM32SyscallHandler:
         self.syscallHandlerMaps = {}
         self.emulator.mu.hook_add(UC_HOOK_INTR, self.hook)
 
-    def hook(self, mu, intno, swi, userdata):
+    def hook(self, mu, intno, userdata):
         # 断点
+        pc = mu.reg_read(UC_ARM_REG_PC)
+        swi = 0
+        # isThumb = True
+        # if isThumb:
+        #     swi = int.from_bytes(mu.mem_read(pc - 2, 2), byteorder='little') & 0xff
+        # else:
+        #     swi = int.from_bytes(mu.mem_read(pc - 4, 4), byteorder='little') & 0xffffff
         if intno == EXCP_BKPT:
             return
         if intno != EXCP_SWI:
@@ -21,7 +28,7 @@ class ARM32SyscallHandler:
             if swi in self.emulator.hooker.hookMaps:
                 mu.reg_write(UC_ARM_REG_R0, self.emulator.hooker.hookMaps[swi](mu))
                 return
-            mu.emu_stop()
+            # mu.emu_stop()
             raise Exception("Unhandled svcHook %d" % swi)
         if NR in self.syscallHandlerMaps:
             mu.reg_write(UC_ARM_REG_R0, self.syscallHandlerMaps[NR](mu))

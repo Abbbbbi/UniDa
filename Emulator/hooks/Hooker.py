@@ -11,7 +11,7 @@ class Hooker:
         hooker_area_size = 0x10000
         self.hooker_area_base = emulator.memory.mmap(0, hooker_area_size, UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC)
         self.nativeHooks = NativeHooks(self)
-        self.jniHooks = JniHooks(self, emulator.vm)
+        self.jniHooks = JniHooks(self, emulator)
 
     def write_function(self, func):
         hookId = self.findMinHookId()
@@ -26,18 +26,18 @@ class Hooker:
         return func_addr
 
     def write_function_table(self, struct_table):
-        PointSize = self.emulator.getPointSize()
+        pointSize = self.emulator.getPointSize()
         tab_len = max(struct_table.keys()) + 1
         struct_table_bytes = b""
         struct_table_addr = self.hooker_area_base
         for index in range(0, tab_len):
             addr = self.write_function(struct_table[index]) if index in struct_table else 0
-            struct_table_bytes += int(addr).to_bytes(PointSize, byteorder='little')
+            struct_table_bytes += int(addr).to_bytes(pointSize, byteorder='little')
         self.emulator.mu.mem_write(struct_table_addr, struct_table_bytes)
         self.hooker_area_base += len(struct_table_bytes)
         struct_table_addr_ptr = self.hooker_area_base
-        self.emulator.mu.mem_write(struct_table_addr_ptr, struct_table_addr.to_bytes(PointSize, byteorder='little'))
-        self.hooker_area_base += PointSize
+        self.emulator.mu.mem_write(struct_table_addr_ptr, struct_table_addr.to_bytes(pointSize, byteorder='little'))
+        self.hooker_area_base += pointSize
         return struct_table_addr_ptr, struct_table_addr
 
     def findMinHookId(self):
