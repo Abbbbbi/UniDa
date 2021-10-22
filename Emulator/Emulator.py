@@ -18,11 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def hook_code(uc, address, size, userdata):
-    print("R0=0x%X R1=0x%X R2=0x%X R3=0x%X R4=0x%X R5=0x%X R6=0x%X R12=0x%X\n" % (
-        uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_R1), uc.reg_read(UC_ARM_REG_R2), uc.reg_read(UC_ARM_REG_R3),
-        uc.reg_read(UC_ARM_REG_R4), uc.reg_read(UC_ARM_REG_R5), uc.reg_read(UC_ARM_REG_R6),
-        uc.reg_read(UC_ARM_REG_R12)))
     print(">>> Tracing instruction at 0x%x, instruction size = 0x%x %s" % (address, size, ptrStr(userdata, address)))
+    print(
+        "UC_ARM64_REG_X0 0x%X UC_ARM64_REG_X1 0x%X UC_ARM64_REG_X2 0x%X UC_ARM64_REG_X3 0x%X UC_ARM64_REG_X29 0x%X "
+        "UC_ARM64_REG_Q0 0x%X" % (
+            uc.reg_read(UC_ARM64_REG_X0), uc.reg_read(UC_ARM64_REG_X1), uc.reg_read(UC_ARM64_REG_X2),
+            uc.reg_read(UC_ARM64_REG_X3), uc.reg_read(UC_ARM64_REG_X29), uc.reg_read(UC_ARM64_REG_Q0)))
 
 
 def hook_memory(uc, access, address, size, value, userdata):
@@ -68,9 +69,9 @@ class Emulator:
 
     def enableVFP(self):
         if self.is64Bit:
-            value = self.mu.reg_read(UC_ARM64_REG_ENDING)
+            value = self.mu.reg_read(UC_ARM64_REG_CPACR_EL1)
             value |= 0x300000
-            self.mu.reg_write(UC_ARM64_REG_ENDING, value)
+            self.mu.reg_write(UC_ARM64_REG_CPACR_EL1, value)
         else:
             value = self.mu.reg_read(UC_ARM_REG_C1_C0_2)
             value |= (0xf << 20)

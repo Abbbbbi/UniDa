@@ -14,7 +14,6 @@ class ARM64SyscallHandler:
         # 断点
         pc = mu.reg_read(UC_ARM64_REG_PC)
         swi = (int.from_bytes(mu.mem_read(pc - 4, 4), byteorder='little') >> 5) & 0xff
-        print(swi)
         if intno == EXCP_BKPT:
             return
         if intno != EXCP_SWI:
@@ -31,4 +30,4 @@ class ARM64SyscallHandler:
             mu.reg_write(UC_ARM64_REG_X0, self.syscallHandlerMaps[NR](mu))
             return
         mu.emu_stop()
-        raise Exception("Unhandled sv %d" % NR)
+        raise Exception("Unhandled svc %d" % NR)

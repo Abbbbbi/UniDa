@@ -10,6 +10,6 @@ logging.basicConfig(level=logging.DEBUG,
 
 if __name__ == "__main__":
     # fridaBridge = AttachBridge("com.tencent.mm")
-    emulator = Emulator("fridaBridge", is64Bit=True, apkPath="bin/apks/weixin809android1940_arm64.apk")
+    emulator = Emulator("fridaBridge", is64Bit=False, apkPath="bin/apks/weixin809android1940.apk")
     emulator.loadLibrary("libwechatnormsg.so", True)
     print(emulator.linker.modules.keys())

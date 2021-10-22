@@ -108,4 +108,6 @@ def write_utf8(mu, address, value):
 
 
 def isThumb(mu):
-    pass
+    CPSR = mu.reg_read(UC_ARM_REG_CPSR)
+    THUMB_BIT = 5
+    return ((CPSR >> THUMB_BIT) & 1) == 1
