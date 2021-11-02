@@ -1,15 +1,26 @@
+import logging
+
 from unicorn import UC_PROT_WRITE, UC_PROT_READ, UC_PROT_EXEC, UC_HOOK_INTR
 
 from Emulator.hooks.JniHooks import JniHooks
 from Emulator.hooks.NativeHooks import NativeHooks
+
+logger = logging.getLogger(__name__)
 
 
 class Hooker:
     def __init__(self, emulator):
         self.emulator = emulator
         self.hookMaps = dict()
-        hooker_area_size = 0x10000
-        self.hooker_area_base = emulator.memory.mmap(0, hooker_area_size, UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC)
+
+        self.hooker_area_size = 0x10000
+        self.hooker_area_base = 0xffff0000
+        emulator.mu.mem_map(self.hooker_area_base, self.hooker_area_size,
+                            UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC)
+
+        logger.debug("Hooker init hooker_area_base= 0x%X hooker_area_size= 0x%X" % (
+            self.hooker_area_base, self.hooker_area_size))
+
         self.nativeHooks = NativeHooks(self)
         self.jniHooks = JniHooks(self, emulator)
 

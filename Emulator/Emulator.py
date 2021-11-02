@@ -1,4 +1,5 @@
 import logging
+from random import randint
 
 from unicorn import *
 from keystone import *
@@ -20,15 +21,20 @@ logger = logging.getLogger(__name__)
 def hook_code(uc, address, size, userdata):
     print(">>> Tracing instruction at 0x%x, instruction size = 0x%x %s" % (address, size, ptrStr(userdata, address)))
     print(
-        "UC_ARM64_REG_X0 0x%X UC_ARM64_REG_X1 0x%X UC_ARM64_REG_X2 0x%X UC_ARM64_REG_X3 0x%X UC_ARM64_REG_X29 0x%X "
-        "UC_ARM64_REG_Q0 0x%X" % (
-            uc.reg_read(UC_ARM64_REG_X0), uc.reg_read(UC_ARM64_REG_X1), uc.reg_read(UC_ARM64_REG_X2),
-            uc.reg_read(UC_ARM64_REG_X3), uc.reg_read(UC_ARM64_REG_X29), uc.reg_read(UC_ARM64_REG_Q0)))
+        "UC_ARM_REG_R0 0x%X UC_ARM_REG_R1 0x%X UC_ARM_REG_R2 0x%X UC_ARM_REG_R3 0x%X UC_ARM_REG_R4 0x%X"
+        "UC_ARM_REG_R5 0x%X UC_ARM_REG_R6 0x%X UC_ARM_REG_R7 0x%X UC_ARM_REG_R8 0x%X" % (
+            uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_R1), uc.reg_read(UC_ARM_REG_R2),
+            uc.reg_read(UC_ARM_REG_R3), uc.reg_read(UC_ARM_REG_R4), uc.reg_read(UC_ARM_REG_R5),
+            uc.reg_read(UC_ARM_REG_R6), uc.reg_read(UC_ARM_REG_R7),
+            uc.reg_read(UC_ARM_REG_R8)))
+    print(
+        "PC 0x%X SP 0x%X" % (uc.reg_read(UC_ARM_REG_PC), uc.reg_read(UC_ARM_REG_SP)))
 
 
 def hook_memory(uc, access, address, size, value, userdata):
+    print(userdata)
     pc = uc.reg_read(UC_ARM_REG_PC)
-    print("memory error: pc:%x address:%x size:%x" % (pc, address, size))
+    print("memory error: pc:%s address:%X size:%x" % (ptrStr(userdata, pc), address, size))
 
 
 class Emulator:
@@ -47,7 +53,7 @@ class Emulator:
         self.syscallHandler = ARM64SyscallHandler(self) if is64Bit else ARM32SyscallHandler(self)
         self.linker = Linker(self)
         self.mu.hook_add(UC_HOOK_CODE, hook_code, self.linker)
-        # self.mu.hook_add(UC_HOOK_MEM_UNMAPPED, hook_memory, 0)
+        # self.mu.hook_add(UC_HOOK_MEM_FETCH_PROT, hook_memory, self.linker)
 
     def loadLibrary(self, fileName, callInit=False):
         return self.linker.do_dlopen(fileName, callInit)
@@ -57,15 +63,17 @@ class Emulator:
             raise Exception("Call addr is None")
         LR_REG = UC_ARM_REG_LR
         R0_REG = UC_ARM_REG_R0
-        LR = 0xffff0000
+        LR = self.hooker.hooker_area_base
         if self.is64Bit:
             LR_REG = UC_ARM64_REG_LR
             R0_REG = UC_ARM64_REG_X0
-            LR = 0x7ffff0000
         self.mu.reg_write(LR_REG, LR)
-        self.mu.emu_start(addr, LR)
+        try:
+            self.mu.emu_start(addr, LR)
+        except UcError:
+            raise Exception(UcError)
         res = self.mu.reg_read(R0_REG)
-        print(res)
+        return res
 
     def enableVFP(self):
         if self.is64Bit:

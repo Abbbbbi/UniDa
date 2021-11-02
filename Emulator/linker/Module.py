@@ -19,8 +19,7 @@ class Module:
                 self.symbol_lookup[addr] = symbol_name
 
     def callInit(self, emulator):
-        for fun_ptr in self.init_array:
-            fun_addr = fun_ptr
+        for fun_addr in self.init_array:
             logger.info("Calling Init_Array %s 0x%X function: 0x%X " % (self.so_name, fun_addr, fun_addr - self.base))
             emulator.call_native(fun_addr)
 

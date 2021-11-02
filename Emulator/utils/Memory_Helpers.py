@@ -27,6 +27,10 @@ def PAGE_END(addr):
     return PAGE_START(addr) + PAGE_SIZE
 
 
+def alignSize(size):
+    return (int((size - 1) / PAGE_SIZE) + 1) * PAGE_SIZE
+
+
 def PFLAGS_TO_PROT(prot_in):
     prot = 0
 
@@ -53,7 +57,7 @@ def getPointerArg(mu, index):
         SP_REG = UC_ARM64_REG_SP
         pointerSize = 8
     if index < regArgCount:
-        return int.from_bytes(mu.reg_read(R0_REG + index), byteorder='little')
+        return mu.reg_read(R0_REG + index)
     sp = mu.reg_read(SP_REG)
     return int.from_bytes(mu.mem_read(sp + (index - regArgCount) * pointerSize), byteorder='little')
 
@@ -67,9 +71,15 @@ def getLRPointer(mu):
 
 def ptrStr(linker, addr):
     m = linker.findModuleByAddress(addr)
+    base = 0
+    mName = "UniDa"
+    if m is not None:
+        base = m.base
+        mName = m.so_name
     protName = ""
     for r in linker.emulator.mu.mem_regions():
         if r[0] <= addr < r[1]:
+            base = r[0]
             prot = r[2]
             if prot & UC_PROT_READ != 0:
                 protName += "R"
@@ -78,7 +88,7 @@ def ptrStr(linker, addr):
             if prot & UC_PROT_EXEC != 0:
                 protName += "X"
 
-    return "%s@0x%X[%s:0x%X]0x%X" % (protName, addr, m.so_name, m.base, addr - m.base)
+    return "%s@0x%X[%s:0x%X]0x%X" % (protName, addr, mName, base, addr - base)
 
 
 def toIntPeer(addr):

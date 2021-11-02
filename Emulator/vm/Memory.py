@@ -10,11 +10,29 @@ class Memory:
     def __init__(self, emulator):
         self.emulator = emulator
         self.sp = 0
+        self.brkAddr = 0
         self.errnoPtr = 0
         self.SP_REG = UC_ARM64_REG_SP if self.emulator.is64Bit else UC_ARM_REG_SP
         self.initStack()
         self.initializeTLS(["ANDROID_DATA=/data",
                             "ANDROID_ROOT=/system"])
+
+    def brk(self,addr):
+        if addr == 0:
+            self.brkAddr = 0x8048000
+            return self.brkAddr
+
+        if addr % PAGE_SIZE != 0:
+            raise NotImplementedError("Unsupported brk operation")
+
+        if addr > self.brkAddr:
+            self.emulator.mu.mem_map(self.brkAddr, addr-self.brkAddr,UC_PROT_READ|UC_PROT_WRITE)
+            self.brkAddr = addr
+        elif addr < self.brkAddr:
+            self.emulator.mu.mem_unmap(addr,self.brkAddr - addr)
+            self.brkAddr = addr
+
+        return self.brkAddr
 
     def initStack(self):
         self.mmap(STACK_ALLOC_BASE - STACK_ALLOC_SIZE, STACK_ALLOC_SIZE, UC_PROT_READ | UC_PROT_WRITE)
@@ -75,16 +93,17 @@ class Memory:
         logger.debug("map address:0x%X, end:0x%X, sz:0x%X offset=0x%X" % (address, address + size, size, offset))
 
         al_address = address
-        al_size = PAGE_END(al_address + size) - al_address
+        # al_size = PAGE_END(al_address + size) - al_address
+        al_size = alignSize(size)
         res_addr = self._map(al_address, al_size, prot, mem_reserve)
         if res_addr != -1 and fdKey != -1:
-            fd = self.emulator.PCB.FDMaps[fdKey]["fd"]
-            fd.seek(offset, 0)
-            data = self._read_fully(fd, size)
+            fo = self.emulator.PCB.FDMaps[fdKey]["fo"]
+            fo.seek(offset, 0)
+            data = self._read_fully(fo, size)
             self.emulator.mu.mem_write(res_addr, data)
         return res_addr
 
-    def _map(self, address, size, prot=UC_PROT_READ | UC_PROT_WRITE, mem_reserve=False):
+    def _map(self, address, size, prot=UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC, mem_reserve=False):
         if size <= 0:
             raise Exception('Heap map size was <= 0.')
         try:
@@ -155,22 +174,21 @@ class Memory:
         if not self._is_multiple(address):
             raise Exception('address was not multiple of page size (%d, %d).' % (address, PAGE_SIZE))
 
-        len_in = PAGE_END(address + len) - address
         try:
-            self.emulator.mu.mem_protect(address, len_in, prot)
+            self.emulator.mu.mem_protect(address, len, prot)
         except unicorn.UcError as e:
-            logger.debug("Warning mprotect with address: 0x%X len: 0x%X prot:0x%X failed!!!" % (address, len, prot))
+            logger.warning("Warning mprotect with address: 0x%X len: 0x%X prot:0x%X failed!!!" % (address, len, prot))
             return -1
         return 0
 
     def munmap(self, address, size):
         if not self._is_multiple(address):
             raise Exception('address was not multiple of page size (%d, %d).' % (address, PAGE_SIZE))
-
-        size = PAGE_END(address + size) - address
+        # size = PAGE_END(address + size) - address
+        size = alignSize(size)
         try:
-            logger.debug("unmap 0x%X sz=0x0x%X end=0x0x%X" % (address, size, address + size))
-            for fdKey, fdMap in self.emulator.syscallHandler.FDMaps:
+            logger.debug("unmap 0x%X sz=0x%X end=0x%X" % (address, size, address + size))
+            for fdKey, fdMap in self.emulator.PCB.FDMaps.items():
                 if fdMap["addr"] == address:
                     del self.emulator.PCB.FDMaps[fdKey]
             self.emulator.mu.mem_unmap(address, size)
@@ -181,17 +199,16 @@ class Memory:
         return 0
 
     @staticmethod
-    def _read_fully(fd, size):
-        b_read = fd.read(size)
+    def _read_fully(fo, size):
+        b_read = fo.read(size)
         sz_read = len(b_read)
         if sz_read <= 0:
             return b_read
 
         sz_left = size - sz_read
         while sz_left > 0:
-            this_read = os.read(fd, sz_left)
+            this_read = fo.read(sz_left)
             len_this_read = len(this_read)
-            logger.debug(len_this_read)
             if len_this_read <= 0:
                 break
             b_read = b_read + this_read
